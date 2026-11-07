@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>游戏截图推广与Q群水印生成器</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Black+Ops+One&family=Russo+One&family=Noto+Sans+SC:wght@700;900&display=swap');
+    
+    body {
+      font-family: 'Noto Sans SC', system-ui, sans-serif;
+      user-select: none;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: #090d16;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 9999px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+    .canvas-checkerboard {
+      background-size: 20px 20px;
+      background-position: 0 0, 10px 10px;
+      background-image: 
+        linear-gradient(45deg, #090d16 25%, transparent 25%), 
+        linear-gradient(-45deg, #090d16 25%, transparent 25%), 
+        linear-gradient(45deg, transparent 75%, #090d16 75%), 
+        linear-gradient(-45deg, transparent 75%, #090d16 75%);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col overflow-hidden">
+
+  <!-- 顶部控制条 -->
+  <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur px-5 py-3 flex items-center justify-between shrink-0 z-20">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 via-rose-600 to-red-600 flex items-center justify-center text-white shadow-lg shadow-red-500/20">
+        <i class="fa-solid fa-gamepad text-lg"></i>
+      </div>
+      <div>
+        <h1 class="text-base font-black tracking-wide text-white flex items-center gap-2">
+          游戏截图推广生成器
+          <span class="text-[10px] font-normal px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">页游/角色背包专版</span>
+        </h1>
+        <p class="text-xs text-slate-400">支持拖拽/剪贴板Ctrl+V粘贴 · 3D浮雕艺术群号 · 防判重微哈希</p>
+      </div>
+    </div>
+
+    <!-- 顶部操作按钮 -->
+    <div class="flex items-center space-x-2">
+      <button id="btnRandomPos" class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs font-semibold rounded-lg shadow transition-all active:scale-95 flex items-center gap-1.5">
+        <i class="fa-solid fa-shuffle"></i>
+        <span>随机位置 & 倾斜</span>
+      </button>
+      <button id="btnCopyImage" class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold rounded-lg shadow transition-all active:scale-95 flex items-center gap-1.5">
+        <i class="fa-regular fa-copy"></i>
+        <span>复制图片</span>
+      </button>
+      <button id="btnDownload" class="px-4 py-1.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white text-xs font-bold rounded-lg shadow-lg shadow-red-600/30 transition-all active:scale-95 flex items-center gap-1.5">
+        <i class="fa-solid fa-download"></i>
+        <span>导出高清图</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- 主体工作台 -->
+  <main class="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+
+    <!-- 左侧参数工具栏 (可滚动) -->
+    <aside class="w-full lg:w-96 bg-slate-900/70 border-r border-slate-800 p-4 custom-scroll overflow-y-auto space-y-4 shrink-0 max-h-full">
+      
+      <!-- 1. 截图上传 / 粘贴引导 -->
+      <section class="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800/80">
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+            <i class="fa-solid fa-image text-rose-400"></i> 底图载入 (截图)
+          </label>
+          <span class="text-[10px] text-emerald-400 bg-emerald-950/70 border border-emerald-800 px-1.5 py-0.5 rounded">支持直接粘贴</span>
+        </div>
+
+        <div id="dropZone" class="border-2 border-dashed border-slate-700/80 hover:border-red-500/70 bg-slate-900/50 hover:bg-red-950/10 rounded-xl p-3 text-center transition-all cursor-pointer group">
+          <input type="file" id="fileInput" accept="image/*" class="hidden">
+          <i class="fa-solid fa-cloud-arrow-up text-2xl text-slate-500 group-hover:text-red-400 transition-colors mb-1"></i>
+          <p class="text-xs text-slate-300 font-medium">点击上传 / 拖拽截图到这里</p>
+          <p class="text-[11px] text-slate-500 mt-0.5">或直接按下 <kbd class="px-1 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] text-slate-300">Ctrl + V</kbd></p>
+        </div>
+
+        <button id="btnLoadPreset" class="mt-2.5 w-full py-1.5 bg-slate-800 hover:bg-slate-700/90 text-slate-300 text-xs font-medium rounded-lg border border-slate-700/60 transition-colors flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i>
+          <span>载入“弹弹堂/页游角色背包”演示图</span>
+        </button>
+      </section>
+
+      <!-- 2. Q群艺术字配置 -->
+      <section class="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800/80 space-y-3">
+        <label class="text-xs font-bold text-slate-300 flex items-center justify-between">
+          <span class="flex items-center gap-1.5">
+            <i class="fa-solid fa-font text-amber-400"></i> 水印文案与艺术风格
+          </span>
+          <span class="text-[10px] text-slate-500">点击画布可自由拖拽</span>
+        </label>
+
+        <div>
+          <label class="text-[11px] text-slate-400 mb-1 block">文字内容</label>
+          <input id="textContent" type="text" value="108+167=1784" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-sm font-bold text-red-400 focus:outline-none focus:border-red-500 transition-colors">
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-[11px] text-slate-400 mb-1 block">前缀快捷搭配</label>
+            <select id="prefixPreset" class="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-300 focus:outline-none">
+              <option value="none">纯数字 (参考图原版)</option>
+              <option value="Q群: ">Q群: </option>
+              <option value="交流裙: ">交流裙: </option>
+              <option value="内部交流: ">内部交流: </option>
+              <option value="领福利+Q: ">领福利+Q: </option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[11px] text-slate-400 mb-1 block">艺术风格质感</label>
+            <select id="artStyle" class="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-300 focus:outline-none focus:border-red-500">
+              <option value="reference3D" selected>🔥 3D浮雕立体红 (参考图)</option>
+              <option value="neonCyber">⚡ 霓虹荧光发光 (高辨识)</option>
+              <option value="goldGamer">👑 战力金灿烫金质感</option>
+              <option value="hollowBorder">🛡️ 粗描边镂空字 (防遮盖)</option>
+              <option value="retroPixel">👾 怀旧像素描边</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 字体与字号调节 -->
+        <div class="space-y-2 pt-1 border-t border-slate-800/60">
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-400">字号大小</span>
+            <span id="fontSizeVal" class="text-red-400 font-mono">56 px</span>
+          </div>
+          <input id="fontSizeSlider" type="range" min="20" max="120" step="2" value="56" class="w-full accent-red-500">
+        </div>
+
+        <div class="space-y-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-400">旋转角度</span>
+            <span id="rotationVal" class="text-red-400 font-mono">0°</span>
+          </div>
+          <input id="rotationSlider" type="range" min="-45" max="45" step="1" value="0" class="w-full accent-red-500">
+        </div>
+
+        <div class="space-y-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-400">字间距 (Letter Spacing)</span>
+            <span id="letterSpacingVal" class="text-red-400 font-mono">2 px</span>
+          </div>
+          <input id="letterSpacingSlider" type="range" min="-5" max="30" step="1" value="2" class="w-full accent-red-500">
+        </div>
+
+        <!-- 限制随机区域范围选项 -->
+        <div class="pt-1 border-t border-slate-800/60">
+          <label class="text-[11px] text-slate-400 mb-1 block">随机分布区域限制</label>
+          <select id="randomRegionSelect" class="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-300 focus:outline-none focus:border-red-500">
+            <option value="safeAll">全图安全区域 (严格不越界)</option>
+            <option value="backpackOnly" selected>仅右半侧道具背包区 (推荐，不挡角色)</option>
+            <option value="bottomCenter">仅画面中下空白带</option>
+            <option value="cornerBottomRight">仅右下角落空白区</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- 3. 防机审/去重特性 & 随机性 -->
+      <section class="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800/80 space-y-3">
+        <label class="text-xs font-bold text-slate-300 flex items-center justify-between">
+          <span class="flex items-center gap-1.5">
+            <i class="fa-solid fa-shield-halved text-cyan-400"></i> 防检测与去重参数
+          </span>
+          <span class="text-[10px] text-cyan-400 bg-cyan-950/70 border border-cyan-800 px-1.5 py-0.5 rounded">保护原图</span>
+        </label>
+
+        <div class="space-y-2.5">
+          <label class="flex items-center justify-between text-xs text-slate-300 cursor-pointer">
+            <span>随机微倾斜 (±1°~±8° 避免死板)</span>
+            <input type="checkbox" id="chkAutoJitter" checked class="accent-red-500 w-4 h-4">
+          </label>
+          <label class="flex items-center justify-between text-xs text-slate-300 cursor-pointer">
+            <span>不可感知像素噪点 (破坏Hash)</span>
+            <input type="checkbox" id="chkPixelNoise" checked class="accent-red-500 w-4 h-4">
+          </label>
+          <label class="flex items-center justify-between text-xs text-slate-300 cursor-pointer">
+            <span>随机边缘微裁剪 (1-3像素)</span>
+            <input type="checkbox" id="chkMicroCrop" class="accent-red-500 w-4 h-4">
+          </label>
+        </div>
+
+        <div class="pt-2">
+          <button id="btnBatch" class="w-full py-2 bg-gradient-to-r from-amber-600/30 to-red-600/30 hover:from-amber-600/50 hover:to-red-600/50 text-amber-200 border border-amber-500/40 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-bolt"></i>
+            <span>一键生成并自动下载新版本</span>
+          </button>
+        </div>
+      </section>
+
+    </aside>
+
+    <!-- 右侧画布区 (可拖拽文字微调) -->
+    <div class="flex-1 flex flex-col bg-slate-950 relative overflow-hidden">
+      <!-- 快捷状态指示 -->
+      <div class="px-4 py-2 border-b border-slate-800/60 bg-slate-900/40 text-xs text-slate-400 flex items-center justify-between z-10 shrink-0">
+        <div class="flex items-center gap-3">
+          <span class="flex items-center gap-1.5 text-slate-300">
+            <i class="fa-solid fa-crosshairs text-red-500"></i>
+            当前文字坐标: <span id="posIndicator" class="font-mono text-slate-200">X: 685, Y: 380</span>
+          </span>
+          <span class="text-slate-600">|</span>
+          <span class="text-[11px] text-slate-400">鼠标按住文字即可在画面上自由拖动</span>
+        </div>
+        <div id="imageDimension" class="font-mono text-[11px] text-slate-500">
+          960 × 540 px
+        </div>
+      </div>
+
+      <!-- 画布容器 -->
+      <div id="canvasContainer" class="flex-1 relative overflow-auto flex items-center justify-center p-4 canvas-checkerboard cursor-crosshair">
+        <canvas id="mainCanvas" class="shadow-2xl rounded-sm max-w-full max-h-full object-contain transition-shadow border border-slate-800/80"></canvas>
+      </div>
+
+      <!-- 气泡提示浮窗 (非阻塞 Toast) -->
+      <div id="toast" class="absolute bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-700 text-slate-200 text-xs px-4 py-2 rounded-xl shadow-2xl transition-all duration-300 opacity-0 pointer-events-none flex items-center gap-2 z-30">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
+        <span id="toastMsg">成功复制到剪贴板！</span>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    // --- 状态配置与数据模型 ---
+    const state = {
+      image: null,
+      imgWidth: 960,
+      imgHeight: 540,
+      
+      // 文字属性
+      rawText: '108+167=1784',
+      prefix: 'none',
+      fontSize: 56,
+      rotation: 0,
+      letterSpacing: 2,
+      artStyle: 'reference3D',
+      randomRegion: 'backpackOnly',
+      
+      // 文字在画布坐标系中的位置 (中心点)
+      textX: 680,
+      textY: 380,
+
+      // 抗风控设置
+      autoJitter: true,
+      pixelNoise: true,
+      microCrop: false,
+
+      // 拖拽文字状态
+      isDragging: false,
+      dragStartX: 0,
+      dragStartY: 0,
+      textBoundRadius: 100
+    };
+
+    const canvas = document.getElementById('mainCanvas');
+    const ctx = canvas.getContext('2d');
+    const posIndicator = document.getElementById('posIndicator');
+    const imageDimension = document.getElementById('imageDimension');
+
+    // --- 消息提示 Toast ---
+    function showToast(msg, icon = 'fa-circle-check text-emerald-400') {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      const toastIcon = document.getElementById('toastIcon');
+      toastMsg.textContent = msg;
+      toastIcon.className = `fa-solid ${icon}`;
+      toast.classList.remove('opacity-0', 'translate-y-2');
+      toast.classList.add('opacity-100', 'translate-y-0');
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        toast.classList.remove('opacity-100', 'translate-y-0');
+      }, 2200);
+    }
+
+    // --- 生成类似弹弹堂/页游角色背包的示例底图 ---
+    function generatePresetGameBackpack() {
+      const w = 980;
+      const h = 570;
+      const tempC = document.createElement('canvas');
+      tempC.width = w;
+      tempC.height = h;
+      const c = tempC.getContext('2d');
+
+      // 1. 游戏主界面底色
+      const bgGrad = c.createLinearGradient(0, 0, w, h);
+      bgGrad.addColorStop(0, '#1a365d');
+      bgGrad.addColorStop(1, '#0f172a');
+      c.fillStyle = bgGrad;
+      c.fillRect(0, 0, w, h);
+
+      // 2. 模拟外层弹窗金黄色/复古皮革大边框
+      const frameX = 40, frameY = 30, frameW = 900, frameH = 510;
+      c.fillStyle = '#854d0e';
+      c.beginPath();
+      c.roundRect(frameX, frameY, frameW, frameH, 16);
+      c.fill();
+      c.strokeStyle = '#ca8a04';
+      c.lineWidth = 4;
+      c.stroke();
+
+      // 弹窗头部标题栏
+      c.fillStyle = '#713f12';
+      c.beginPath();
+      c.roundRect(frameX + 6, frameY + 6, frameW - 12, 40, 10);
+      c.fill();
+      c.fillStyle = '#fef08a';
+      c.font = 'bold 18px "Noto Sans SC", sans-serif';
+      c.fillText('背包 (B)', frameX + 24, frameY + 32);
+
+      // 3. 左半边：个人角色装备区
+      const leftW = 400;
+      c.fillStyle = '#fef3c7';
+      c.beginPath();
+      c.roundRect(frameX + 16, frameY + 54, leftW, frameH - 70, 8);
+      c.fill();
+      c.strokeStyle = '#d97706';
+      c.lineWidth = 2;
+      c.stroke();
+
+      // 角色形象占位 (萌系卡通形象)
+      c.fillStyle = '#e2e8f0';
+      c.beginPath();
+      c.arc(frameX + 210, frameY + 230, 85, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#93c5fd';
+      c.beginPath();
+      c.arc(frameX + 210, frameY + 210, 60, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#1e3a8a';
+      c.font = 'bold 15px "Noto Sans SC", sans-serif';
+      c.textAlign = 'center';
+      c.fillText('👑 战力榜第一名 👑', frameX + 210, frameY + 220);
+      c.font = '13px "Noto Sans SC", sans-serif';
+      c.fillStyle = '#475569';
+      c.fillText('角色: ID ', frameX + 210, frameY + 245);
+
+      // 4. 右半边：道具背包网格 (重点，还原参考图红字浮在背包格子上的效果)
+      const bagX = frameX + 430;
+      const bagY = frameY + 80;
+      const gridCols = 8;
+      const gridRows = 5;
+      const cellW = 54;
+      const cellH = 54;
+
+      // 背包外框
+      c.fillStyle = '#fefce8';
+      c.fillRect(bagX - 6, bagY - 6, gridCols * cellW + 12, gridRows * cellH + 12);
+      c.strokeStyle = '#b45309';
+      c.lineWidth = 3;
+      c.strokeRect(bagX - 6, bagY - 6, gridCols * cellW + 12, gridRows * cellH + 12);
+
+      // 绘制空背包格子
+      for (let r = 0; r < gridRows; r++) {
+        for (let col = 0; col < gridCols; col++) {
+          const cx = bagX + col * cellW;
+          const cy = bagY + r * cellH;
+          c.fillStyle = (r + col) % 2 === 0 ? '#f8fafc' : '#f1f5f9';
+          c.fillRect(cx, cy, cellW - 2, cellH - 2);
+          c.strokeStyle = '#cbd5e1';
+          c.lineWidth = 1;
+          c.strokeRect(cx, cy, cellW - 2, cellH - 2);
+
+          // 前两排塞点模拟装备图标
+          if (r < 2) {
+            c.fillStyle = '#6366f1';
+            c.beginPath();
+            c.roundRect(cx + 6, cy + 6, cellW - 14, cellH - 14, 6);
+            c.fill();
+            c.fillStyle = '#ffffff';
+            c.font = 'bold 10px sans-serif';
+            c.fillText('★', cx + 18, cy + 24);
+          }
+        }
+      }
+
+      // 底部属性条
+      c.fillStyle = '#451a03';
+      c.fillRect(frameX + 16, frameY + frameH - 60, frameW - 32, 45);
+      c.fillStyle = '#fef08a';
+      c.font = 'bold 13px sans-serif';
+      c.textAlign = 'left';
+      c.fillText('战力: 77493594096   攻击: 331695   敏捷: 334253   防御: 331499   魔抗: 34402', frameX + 30, frameY + frameH - 32);
+
+      const img = new Image();
+      img.src = tempC.toDataURL('image/png');
+      img.onload = () => {
+        state.image = img;
+        state.imgWidth = img.width;
+        state.imgHeight = img.height;
+        // 默认将文字定位于背包空白网格区域 (如参考图第3~4排)
+        state.textX = bagX + (gridCols * cellW) / 2;
+        state.textY = bagY + 2.8 * cellH;
+        render();
+      };
+    }
+
+    // --- 组装最终展示的文字 ---
+    function getDisplayText() {
+      const prefix = state.prefix === 'none' ? '' : state.prefix;
+      return prefix + state.rawText;
+    }
+
+    // --- 核心渲染循环 ---
+    function render() {
+      if (!state.image) return;
+
+      canvas.width = state.imgWidth;
+      canvas.height = state.imgHeight;
+      imageDimension.textContent = `${state.imgWidth} × ${state.imgHeight} px`;
+
+      // 1. 绘制底图
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(state.image, 0, 0, state.imgWidth, state.imgHeight);
+
+      // 2. 绘制艺术字
+      drawArtText();
+
+      // 3. 抗机审微噪点 (如果启用)
+      if (state.pixelNoise) {
+        applyAntiFingerprintNoise();
+      }
+
+      // 更新坐标提示
+      posIndicator.textContent = `X: ${Math.round(state.textX)}, Y: ${Math.round(state.textY)}`;
+    }
+
+    // --- 绘制各种质感的艺术字 ---
+    function drawArtText() {
+      const text = getDisplayText();
+      if (!text) return;
+
+      ctx.save();
+      ctx.translate(state.textX, state.textY);
+      ctx.rotate((state.rotation * Math.PI) / 180);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      const fSize = state.fontSize;
+
+      // 1. 参考图原版风格：3D立体浮雕红白数字
+      if (state.artStyle === 'reference3D') {
+        ctx.font = `900 ${fSize}px "Noto Sans SC", "Black Ops One", sans-serif`;
+
+        // 底部厚重立体深暗红投影
+        for (let i = 5; i > 0; i--) {
+          ctx.fillStyle = '#7f1d1d'; // deep red
+          ctx.fillText(text, 0, i * 1.5);
+        }
+
+        // 外部微细发光
+        ctx.shadowColor = 'rgba(239, 68, 68, 0.4)';
+        ctx.shadowBlur = 12;
+
+        // 正面鲜红主体
+        const redGrad = ctx.createLinearGradient(0, -fSize/2, 0, fSize/2);
+        redGrad.addColorStop(0, '#ff3b30');
+        redGrad.addColorStop(0.5, '#dc2626');
+        redGrad.addColorStop(1, '#991b1b');
+        ctx.fillStyle = redGrad;
+        ctx.fillText(text, 0, 0);
+
+        // 顶部高光亮红线
+        ctx.strokeStyle = '#fecaca';
+        ctx.lineWidth = 1;
+        ctx.strokeText(text, 0, -0.5);
+
+      } else if (state.artStyle === 'neonCyber') {
+        // 霓虹发光防遮挡
+        ctx.font = `900 ${fSize}px "ZCOOL KuaiLe", "Russo One", sans-serif`;
+        ctx.shadowColor = '#06b6d4';
+        ctx.shadowBlur = 20;
+
+        ctx.strokeStyle = '#0891b2';
+        ctx.lineWidth = 7;
+        ctx.strokeText(text, 0, 0);
+
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = '#ecfeff';
+        ctx.fillText(text, 0, 0);
+
+      } else if (state.artStyle === 'goldGamer') {
+        // 游戏战力烫金质感
+        ctx.font = `900 ${fSize}px "Noto Sans SC", sans-serif`;
+
+        // 金色立体阴影
+        for (let i = 4; i > 0; i--) {
+          ctx.fillStyle = '#78350f';
+          ctx.fillText(text, i, i);
+        }
+
+        const goldGrad = ctx.createLinearGradient(0, -fSize/2, 0, fSize/2);
+        goldGrad.addColorStop(0, '#fef08a');
+        goldGrad.addColorStop(0.5, '#f59e0b');
+        goldGrad.addColorStop(1, '#b45309');
+        ctx.fillStyle = goldGrad;
+        ctx.fillText(text, 0, 0);
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.2;
+        ctx.strokeText(text, 0, 0);
+
+      } else if (state.artStyle === 'hollowBorder') {
+        // 空心粗双描边防遮挡
+        ctx.font = `900 ${fSize}px "Black Ops One", sans-serif`;
+        
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 8;
+        ctx.strokeText(text, 0, 0);
+
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 4;
+        ctx.strokeText(text, 0, 0);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(text, 0, 0);
+
+      } else {
+        // 怀旧像素/纯红街机
+        ctx.font = `900 ${fSize}px "ZCOOL KuaiLe", monospace`;
+        ctx.fillStyle = '#000000';
+        ctx.fillText(text, 3, 3);
+        ctx.fillStyle = '#ef4444';
+        ctx.fillText(text, 0, 0);
+      }
+
+      // 计算文本交互外包盒（供拖拽拾取）
+      const metrics = ctx.measureText(text);
+      state.textBoundRadius = Math.max(metrics.width / 2, fSize);
+
+      ctx.restore();
+    }
+
+    // --- 精确计算文字旋转及阴影/描边后的轴对齐外包盒 (AABB) 半宽高 ---
+    function getRotatedTextHalfSize(angleDeg = state.rotation) {
+      const text = getDisplayText();
+      if (!text) return { halfW: 20, halfH: 20 };
+
+      // 临时测量原文字未旋转时的宽高
+      ctx.save();
+      ctx.font = `900 ${state.fontSize}px "Noto Sans SC", sans-serif`;
+      const metrics = ctx.measureText(text);
+      const rawW = metrics.width;
+      // 字高估算（含上行高度、3D阴影厚度与描边余量）
+      const strokeExtra = state.artStyle === 'hollowBorder' ? 16 : 8;
+      const depthExtra = state.artStyle === 'reference3D' ? 14 : 6;
+      const rawH = state.fontSize * 1.1 + depthExtra + strokeExtra;
+      const totalW = rawW + strokeExtra * 2;
+      ctx.restore();
+
+      // 考虑旋转后的 AABB (Axis-Aligned Bounding Box) 膨胀
+      const rad = Math.abs((angleDeg * Math.PI) / 180);
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+
+      const aabbWidth = totalW * cos + rawH * sin;
+      const aabbHeight = totalW * sin + rawH * cos;
+
+      // 额外留 10px 呼吸边距，杜绝任何像素贴边或溢出
+      const safePadding = 10;
+      return {
+        halfW: aabbWidth / 2 + safePadding,
+        halfH: aabbHeight / 2 + safePadding
+      };
+    }
+
+    // --- 强制将中心坐标钳制在合法画布范围内 ---
+    function clampTextPosition(x, y, angleDeg = state.rotation) {
+      const { halfW, halfH } = getRotatedTextHalfSize(angleDeg);
+      const minX = halfW;
+      const maxX = canvas.width - halfW;
+      const minY = halfH;
+      const maxY = canvas.height - halfH;
+
+      // 避免当文字极其巨大超出画布尺寸时的倒挂
+      const clampedX = minX >= maxX ? canvas.width / 2 : Math.max(minX, Math.min(maxX, x));
+      const clampedY = minY >= maxY ? canvas.height / 2 : Math.max(minY, Math.min(maxY, y));
+      return { x: clampedX, y: clampedY };
+    }
+
+    // --- 不可感知的微像素噪点 (对抗全网图像去重机制与MD5/Hash审查) ---
+    // --- 一键随机定位与倾斜 (绝不越界算法) ---
+    function randomizePosition() {
+      if (!state.image) return;
+
+      // 1. 随机倾斜角度 (先选定角度以便计算旋转后的包围盒)
+      let targetRotation = state.rotation;
+      if (state.autoJitter) {
+        const anglePool = [-12, -8, -5, -3, 0, 3, 5, 8, 12];
+        targetRotation = anglePool[Math.floor(Math.random() * anglePool.length)];
+        state.rotation = targetRotation;
+        document.getElementById('rotationSlider').value = state.rotation;
+        document.getElementById('rotationVal').textContent = `${state.rotation}°`;
+      }
+
+      // 2. 获取包含旋转/阴影/外扩的包围盒半尺寸
+      const { halfW, halfH } = getRotatedTextHalfSize(targetRotation);
+
+      // 3. 根据所选区域计算可行域区间 [minX, maxX], [minY, maxY]
+      let minX = halfW;
+      let maxX = canvas.width - halfW;
+      let minY = halfH;
+      let maxY = canvas.height - halfH;
+
+      if (state.randomRegion === 'backpackOnly') {
+        // 限制在右侧 48% ~ 95% 范围 (背包网格区域)
+        minX = Math.max(canvas.width * 0.48 + halfW, halfW);
+        maxX = Math.min(canvas.width * 0.95 - halfW, canvas.width - halfW);
+        minY = Math.max(canvas.height * 0.18 + halfH, halfH);
+        maxY = Math.min(canvas.height * 0.82 - halfH, canvas.height - halfH);
+      } else if (state.randomRegion === 'bottomCenter') {
+        // 限制在屏幕中下 25% ~ 75% 范围
+        minX = Math.max(canvas.width * 0.25 + halfW, halfW);
+        maxX = Math.min(canvas.width * 0.75 - halfW, canvas.width - halfW);
+        minY = Math.max(canvas.height * 0.60 + halfH, halfH);
+        maxY = Math.min(canvas.height * 0.92 - halfH, canvas.height - halfH);
+      } else if (state.randomRegion === 'cornerBottomRight') {
+        // 限制在右下角
+        minX = Math.max(canvas.width * 0.55 + halfW, halfW);
+        maxX = Math.min(canvas.width * 0.92 - halfW, canvas.width - halfW);
+        minY = Math.max(canvas.height * 0.55 + halfH, halfH);
+        maxY = Math.min(canvas.height * 0.88 - halfH, canvas.height - halfH);
+      }
+
+      // 如果区域范围受限导致区间倒挂（文字特别大时），自动回退到全图安全区
+      if (minX >= maxX) {
+        minX = halfW;
+        maxX = canvas.width - halfW;
+      }
+      if (minY >= maxY) {
+        minY = halfH;
+        maxY = canvas.height - halfH;
+      }
+
+      // 4. 随机生成并在边界内严格夹紧
+      const randomX = minX >= maxX ? canvas.width / 2 : minX + Math.random() * (maxX - minX);
+      const randomY = minY >= maxY ? canvas.height / 2 : minY + Math.random() * (maxY - minY);
+
+      const clamped = clampTextPosition(randomX, randomY, targetRotation);
+      state.textX = clamped.x;
+      state.textY = clamped.y;
+
+      render();
+    }
+
+    // --- 图片载入统一处理 (文件/Blob) ---
+    function handleImageFile(file) {
+      if (!file || !file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          state.image = img;
+          state.imgWidth = img.width;
+          state.imgHeight = img.height;
+          // 默认居中偏右下（常见背包空白区）
+          state.textX = img.width * 0.65;
+          state.textY = img.height * 0.65;
+          render();
+          showToast('截图导入成功！可拖拽或随机位置');
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // --- 事件绑定 ---
+
+    // 1. 剪贴板 Ctrl+V 直接粘贴
+    window.addEventListener('paste', (e) => {
+      const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+      for (const item of items) {
+        if (item.type.indexOf('image') !== -1) {
+          const file = item.getAsFile();
+          handleImageFile(file);
+          break;
+        }
+      }
+    });
+
+    // 2. 拖拽上传与文件框
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length) handleImageFile(e.target.files[0]);
+    });
+
+    ['dragenter', 'dragover'].forEach(name => {
+      dropZone.addEventListener(name, (e) => {
+        e.preventDefault();
+        dropZone.classList.add('border-red-500', 'bg-red-950/20');
+      });
+    });
+    ['dragleave', 'drop'].forEach(name => {
+      dropZone.addEventListener(name, (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-red-500', 'bg-red-950/20');
+      });
+    });
+    dropZone.addEventListener('drop', (e) => {
+      if (e.dataTransfer.files.length) {
+        handleImageFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    // 3. 载入预设按钮
+    document.getElementById('btnLoadPreset').addEventListener('click', () => {
+      generatePresetGameBackpack();
+      showToast('已重置为页游背包演示图');
+    });
+
+    // 4. 输入与样式绑定
+    document.getElementById('textContent').addEventListener('input', (e) => {
+      state.rawText = e.target.value;
+      render();
+    });
+
+    document.getElementById('prefixPreset').addEventListener('change', (e) => {
+      state.prefix = e.target.value;
+      render();
+    });
+
+    document.getElementById('artStyle').addEventListener('change', (e) => {
+      state.artStyle = e.target.value;
+      render();
+    });
+
+    document.getElementById('fontSizeSlider').addEventListener('input', (e) => {
+      state.fontSize = parseInt(e.target.value);
+      document.getElementById('fontSizeVal').textContent = `${state.fontSize} px`;
+      render();
+    });
+
+    document.getElementById('rotationSlider').addEventListener('input', (e) => {
+      state.rotation = parseInt(e.target.value);
+      document.getElementById('rotationVal').textContent = `${state.rotation}°`;
+      render();
+    });
+
+    document.getElementById('letterSpacingSlider').addEventListener('input', (e) => {
+      state.letterSpacing = parseInt(e.target.value);
+      document.getElementById('letterSpacingVal').textContent = `${state.letterSpacing} px`;
+      render();
+    });
+
+    document.getElementById('randomRegionSelect').addEventListener('change', (e) => {
+      state.randomRegion = e.target.value;
+    });
+
+    document.getElementById('chkAutoJitter').addEventListener('change', (e) => {
+      state.autoJitter = e.target.checked;
+    });
+
+    document.getElementById('chkPixelNoise').addEventListener('change', (e) => {
+      state.pixelNoise = e.target.checked;
+      render();
+    });
+
+    // 随机位置按钮
+    document.getElementById('btnRandomPos').addEventListener('click', () => {
+      randomizePosition();
+      showToast('已随机变换位置与角度！');
+    });
+
+    // 5. Canvas 鼠标交互 (拖拽文字移动)
+    function getCanvasCoords(e) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY
+      };
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+      const pos = getCanvasCoords(e);
+      // 距离文字中心的距离
+      const dist = Math.hypot(pos.x - state.textX, pos.y - state.textY);
+      if (dist < state.textBoundRadius + 30) {
+        state.isDragging = true;
+        canvas.style.cursor = 'grabbing';
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!state.isDragging) return;
+      const pos = getCanvasCoords(e);
+      // 拖拽过程也受到安全包围盒夹紧保护，防止拖到画框外面
+      const clamped = clampTextPosition(pos.x, pos.y);
+      state.textX = clamped.x;
+      state.textY = clamped.y;
+      render();
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (state.isDragging) {
+        state.isDragging = false;
+        canvas.style.cursor = 'crosshair';
+      }
+    });
+
+    // 6. 复制图片到剪贴板
+    document.getElementById('btnCopyImage').addEventListener('click', async () => {
+      try {
+        canvas.toBlob(async (blob) => {
+          if (!blob) return;
+          const item = new ClipboardItem({ 'image/png': blob });
+          await navigator.clipboard.write([item]);
+          showToast('已复制图片到剪贴板！可直接粘贴至QQ/群聊');
+        });
+      } catch (err) {
+        showToast('直接复制受限，请使用下载导出', 'fa-triangle-exclamation text-amber-400');
+      }
+    });
+
+    // 7. 高清图片下载
+    document.getElementById('btnDownload').addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.download = `游戏推广图_${state.rawText}_${Date.now()}.png`;
+      link.href = canvas.toDataURL('image/png', 1.0);
+      link.click();
+      showToast('高清推广图下载完成！');
+    });
+
+    // 8. 批量/快速打乱并下载
+    document.getElementById('btnBatch').addEventListener('click', () => {
+      randomizePosition();
+      setTimeout(() => {
+        const link = document.createElement('a');
+        link.download = `自动推广_${state.rawText}_${Math.floor(Math.random()*9000+1000)}.png`;
+        link.href = canvas.toDataURL('image/png', 1.0);
+        link.click();
+        showToast('已生成新随机版本并下载！');
+      }, 50);
+    });
+
+    // 初始化运行
+    window.onload = () => {
+      generatePresetGameBackpack();
+    };
+  </script>
+</body>
+</html>
